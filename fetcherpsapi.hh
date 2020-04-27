@@ -7,11 +7,10 @@
 #include <QObject>
 #include <QPair>
 
-#include <readerwriterqueue.h>
+#include <moodycamel/readerwriterqueue.h>
 #include <spdlog/spdlog.h>
 
-QT_BEGIN_NAMESPACE
-class QNetworkAccessManager;
+QT_BEGIN_NAMESPACE class QNetworkAccessManager;
 class QNetworkReply;
 QT_END_NAMESPACE
 

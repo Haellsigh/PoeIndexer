@@ -34,11 +34,6 @@ target_sources(PoeIndexer PRIVATE
   dbupdater.cpp
 )
 
-target_sources(PoeIndexer PRIVATE
-  atomicops.h
-  readerwriterqueue.h
-)
-
 # Load libraries
 find_package(Qt5 COMPONENTS Core Network Sql REQUIRED)
 add_subdirectory(libs)

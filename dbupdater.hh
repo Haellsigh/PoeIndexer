@@ -3,7 +3,7 @@
 #include <QObject>
 #include <QSqlDatabase>
 
-#include <readerwriterqueue.h>
+#include <moodycamel/readerwriterqueue.h>
 #include <spdlog/spdlog.h>
 
 #include "apitypes.hh"

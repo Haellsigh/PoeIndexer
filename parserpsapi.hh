@@ -2,7 +2,7 @@
 
 #include <QObject>
 
-#include <readerwriterqueue.h>
+#include <moodycamel/readerwriterqueue.h>
 #include <spdlog/spdlog.h>
 
 /**
