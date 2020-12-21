@@ -1,32 +1,28 @@
 ﻿#include "fetcherpsapi.hh"
 
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QQueue>
-
 #include "sizeunit.hh"
 
 static constexpr const char* baseUrl =
     "http://www.pathofexile.com/api/public-stash-tabs?id=";
 
-FetcherPSAPI::FetcherPSAPI(QObject* parent) : QObject(parent) {}
+FetcherPSAPI::FetcherPSAPI(/*QObject* parent*/) /*: QObject(parent)*/ {}
 
 void FetcherPSAPI::init(
-    spdlog::sinks_init_list                                     sinks,
-    const QString&                                              next_change_id,
-    std::shared_ptr<moodycamel::ReaderWriterQueue<QByteArray> > rawDataQueue) {
+    spdlog::sinks_init_list                                              sinks,
+    const std::string&                                                   next_change_id,
+    std::shared_ptr<moodycamel::ReaderWriterQueue<std::vector<uint8_t>>> rawDataQueue) {
   mLogger = std::make_shared<spdlog::logger>("fetcher", sinks);
   mLogger->set_level(spdlog::level::trace);
 
-  mRawDataQueue  = rawDataQueue;
-  mAccessManager = new QNetworkAccessManager(this);
+  mRawDataQueue = rawDataQueue;
+  /*mAccessManager = new QNetworkAccessManager(this);
 
   connect(mAccessManager, &QNetworkAccessManager::finished, this,
-          &FetcherPSAPI::handleFetched);
+          &FetcherPSAPI::handleFetched);*/
 
   mLogger->info("Initialized");
 
-  mTotalTimer.start();
+  // mTotalTimer.start();
   fetch(next_change_id);
 }
 
@@ -46,51 +42,52 @@ bool FetcherPSAPI::canFetch() {
   return true;
 }
 
-void FetcherPSAPI::fetch(const QString& next_change_id) {
+void FetcherPSAPI::fetch(const std::string& next_change_id) {
   mLastChangeId = next_change_id;
   // Store fetch time for rate limiting
   mFetchTime.push_back(std::chrono::high_resolution_clock::now());
 
   // Fetch
-  mLogger->info("Fetching {}", next_change_id.toStdString());
+  mLogger->info("Fetching {}", next_change_id);
 
-  QNetworkRequest req(baseUrl + next_change_id);
+  /*QNetworkRequest req(baseUrl + next_change_id);
   req.setRawHeader(
       "User-Agent",
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:75.0) Gecko/20100101 Firefox/75.0");
 
   auto reply = mAccessManager->get(req);
-  mReplies.insert(reply, {});
+  mReplies.insert(reply, {});*/
 
   // Fetches next_change_id before the download is complete
-  connect(reply, &QNetworkReply::readyRead, [&, reply]() {
-    handleNewData(reply, true);
-    /*
-    auto&& stashReply = mReplies[reply];
-    auto&& data       = stashReply.data;
-    data.append(reply->readAll());
+  /*connect(reply, &QNetworkReply::readyRead, [&, reply]() {
+    handleNewData(reply, true);*/
+  /*
+  auto&& stashReply = mReplies[reply];
+  auto&& data       = stashReply.data;
+  data.append(reply->readAll());
 
-    // If we're rate limited, don't fetch next request yet
-    if (!checkRateLimits(reply))
-      return;
+  // If we're rate limited, don't fetch next request yet
+  if (!checkRateLimits(reply))
+    return;
 
-    if (!stashReply.fetchingNextChangeId && data.contains(',')) {
-      auto next_change_id = extractNextChangeId(data);
-      if (next_change_id != mLastChangeId) {
-        stashReply.fetchingNextChangeId = true;
-        while (!canFetch()) {
-          mLogger->warn("Waiting 500ms to avoid rate limiting");
-          std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        }
-        fetch(next_change_id);
+  if (!stashReply.fetchingNextChangeId && data.contains(',')) {
+    auto next_change_id = extractNextChangeId(data);
+    if (next_change_id != mLastChangeId) {
+      stashReply.fetchingNextChangeId = true;
+      while (!canFetch()) {
+        mLogger->warn("Waiting 500ms to avoid rate limiting");
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
       }
+      fetch(next_change_id);
     }
-    */
-  });
+  }
+  */
+  /*});*/
 }
 
+/*
 void FetcherPSAPI::handleNewData(QNetworkReply* reply,
-                                 bool           stopOnRateLimiting /* = false */) {
+                                 bool           stopOnRateLimiting) {
   auto&& stashReply = mReplies[reply];
   auto&& data       = stashReply.data;
   data.append(reply->readAll());
@@ -139,40 +136,6 @@ void FetcherPSAPI::handleFetched(QNetworkReply* reply) {
   // Cleanup
   mReplies.remove(reply);
   reply->deleteLater();
-
-  /*
-  const auto& size = stashReply.data.size();
-  mTotalSize += size;
-
-  // Speed calculations
-  double speed = (size / (stashReply.timer.elapsed() / 1000.));
-
-  mLogger->trace("Downloaded {} at {}/s", SizeUnit(size), SizeUnit(speed));
-  mLogger->trace("Total speed: {}/s",
-                 SizeUnit(mTotalSize / (mTotalTimer.elapsed() / 1000.)));
-
-  // Check rate limiting
-  if (!checkRateLimits(reply)) {
-    waitRateLimitingTimeout(reply);
-  }
-
-  // Fetch next data if we haven't started already
-  if (!stashReply.fetchingNextChangeId) {
-    auto&& data = stashReply.data;
-    mLogger->debug("Fetching late next_change_id");
-    auto next_change_id = extractNextChangeId(data);
-    if (next_change_id.count('-') == 4) {
-      if (next_change_id == mLastChangeId) {
-        mLogger->info("Catched up to real-time, waiting 1s to avoid empty responses");
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-      }
-      fetch(next_change_id);
-    } else {
-      mLogger->critical("Stash API reply does not contain next_change_id data: {}",
-                        data.toStdString());
-    }
-  }
-  */
 }
 
 QString FetcherPSAPI::extractNextChangeId(const QByteArray& data) {
@@ -203,3 +166,4 @@ void FetcherPSAPI::waitRateLimitingTimeout(QNetworkReply* reply) {
     std::this_thread::sleep_for(std::chrono::seconds(timeout));
   }
 }
+*/

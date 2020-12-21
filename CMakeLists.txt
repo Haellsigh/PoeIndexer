@@ -4,10 +4,6 @@ project(PoeIndexer LANGUAGES CXX)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
-
 add_executable(PoeIndexer "")
 
 # LTO support
@@ -35,9 +31,7 @@ target_sources(PoeIndexer PRIVATE
 )
 
 # Load libraries
-find_package(Qt5 COMPONENTS Core Network Sql REQUIRED)
 add_subdirectory(libs)
 find_package(spdlog CONFIG REQUIRED)
 # Link libraries
-target_link_libraries(PoeIndexer PRIVATE Qt5::Core Qt5::Network Qt5::Sql)
 target_link_libraries(PoeIndexer PRIVATE spdlog::spdlog spdlog::spdlog_header_only)

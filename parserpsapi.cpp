@@ -1,14 +1,12 @@
 #include "parserpsapi.hh"
 
-#include <QElapsedTimer>
-
 #include <simdjson/simdjson.h>
 
-ParserPSAPI::ParserPSAPI(QObject* parent) : QObject(parent) {}
+ParserPSAPI::ParserPSAPI(/*QObject* parent*/) /*: QObject(parent)*/ {}
 
 void ParserPSAPI::init(
-    spdlog::sinks_init_list                                    sinks,
-    std::shared_ptr<moodycamel::ReaderWriterQueue<QByteArray>> rawDataQueue) {
+    spdlog::sinks_init_list                                              sinks,
+    std::shared_ptr<moodycamel::ReaderWriterQueue<std::vector<uint8_t>>> rawDataQueue) {
   mLogger = std::make_shared<spdlog::logger>("parser", sinks);
   mLogger->set_level(spdlog::level::trace);
 
@@ -20,16 +18,16 @@ void ParserPSAPI::init(
 void ParserPSAPI::parse() {
   using namespace simdjson;
 
-  QByteArray data;
+  std::vector<uint8_t> data;
   while (mRawDataQueue->try_dequeue(data)) {
-    QElapsedTimer timer;
-    timer.start();
+    // QElapsedTimer timer;
+    // timer.start();
 
     dom::parser parser;
     dom::object object;
     error_code  error;
 
-    parser.parse(padded_string(data.data(), data.size()))
+    /*parser.parse(padded_string(data.data(), data.size()))
         .get<dom::object>()
         .tie(object, error);
 
@@ -76,11 +74,11 @@ void ParserPSAPI::parse() {
         // mLogger->trace("Account {}, stash id {}", stash["accountName"], stash["id"]);
       } else {
       }
-    }
+    }*/
 
-    mLogger->debug("Parsed {}/{} items within {}/{} stashes in {} ms", nItemsDelirium,
-                   nItems, nStashesDelirium, nStashes, timer.elapsed());
+    /*mLogger->debug("Parsed {}/{} items within {}/{} stashes in {} ms", nItemsDelirium,
+                   nItems, nStashesDelirium, nStashes, timer.elapsed());*/
   }
 
-  emit parsed();
+  // emit parsed();
 }

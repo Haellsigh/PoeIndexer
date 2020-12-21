@@ -1,6 +1,5 @@
 #include <csignal>
-
-#include <QCoreApplication>
+#include <memory>
 
 #include <moodycamel/readerwriterqueue.h>
 #include <spdlog/sinks/daily_file_sink.h>
@@ -11,16 +10,7 @@
 #include "fetcherpsapi.hh"
 #include "parserpsapi.hh"
 
-void signal_handler(int signal) {
-  if (signal == SIGINT) {
-    spdlog::info("Terminating app");
-    QCoreApplication::quit();
-  } else {
-    spdlog::critical("Unhandled signal");
-  }
-}
-
-int main(int argc, char* argv[]) {
+auto setupLogging() {
   /// Setup logging
   spdlog::set_level(spdlog::level::trace);
   // Create console sink
@@ -38,29 +28,39 @@ int main(int argc, char* argv[]) {
   // Set default logger
   spdlog::set_default_logger(std::make_shared<spdlog::logger>("main", sinks));
 
+  return sinks;
+}
+
+void signal_handler(int signal) {
+  if (signal == SIGINT) {
+    spdlog::info("Terminating app");
+  } else {
+    spdlog::critical("Unhandled signal");
+  }
+}
+
+int main(int argc, char* argv[]) {
+  auto sinks = setupLogging();
+
   spdlog::info("Starting application");
-  // Handle signals
-  spdlog::info("Handling signals");
   std::signal(SIGINT, signal_handler);
 
-  // Start core application
-  spdlog::info("Starting core application");
-  QCoreApplication a(argc, argv);
-
-  auto rawDataQueue = std::make_shared<moodycamel::ReaderWriterQueue<QByteArray>>(1);
-  auto stashQueue   = std::make_shared<moodycamel::ReaderWriterQueue<Stash>>(1);
+  auto rawDataQueue =
+      std::make_shared<moodycamel::ReaderWriterQueue<std::vector<uint8_t>>>(1);
+  auto stashQueue = std::make_shared<moodycamel::ReaderWriterQueue<Stash>>(1);
 
   FetcherPSAPI fetcher;
   ParserPSAPI  parser;
   DbUpdater    updater;
 
-  a.connect(&fetcher, &FetcherPSAPI::fetched, &parser, &ParserPSAPI::parse);
-  a.connect(&parser, &ParserPSAPI::parsed, &updater, &DbUpdater::update);
+  // a.connect(&fetcher, &FetcherPSAPI::fetched, &parser, &ParserPSAPI::parse);
+  // a.connect(&parser, &ParserPSAPI::parsed, &updater, &DbUpdater::update);
 
   spdlog::info("Starting threads");
   updater.init(sinks, stashQueue);
   parser.init(sinks, rawDataQueue);
   fetcher.init(sinks, "692825803-707790951-674874738-763885917-729048811", rawDataQueue);
 
-  return a.exec();
+  // return a.exec();
+  return 0;
 }

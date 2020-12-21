@@ -1,8 +1,5 @@
 #pragma once
 
-#include <QObject>
-#include <QSqlDatabase>
-
 #include <moodycamel/readerwriterqueue.h>
 #include <spdlog/spdlog.h>
 
@@ -11,18 +8,18 @@
 /**
  * In charge of updating the database with the data put in the queues.
  */
-class DbUpdater : public QObject {
-  Q_OBJECT
+class DbUpdater /*: public QObject*/ {
+  // Q_OBJECT
  public:
-  explicit DbUpdater(QObject* parent = nullptr);
+  explicit DbUpdater(/*QObject* parent = nullptr*/);
 
   void init(spdlog::sinks_init_list                               sinks,
             std::shared_ptr<moodycamel::ReaderWriterQueue<Stash>> stashQueue);
 
- signals:
+  // signals:
   void updated();
 
- public slots:
+ public /* slots*/:
   void update();
 
  private:
