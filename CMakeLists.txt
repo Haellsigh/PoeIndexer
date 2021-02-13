@@ -1,4 +1,7 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.19)
+
+# Vcpkg as a submodule
+set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake CACHE STRING "Vcpkg toolchain file")
 
 project(PoeIndexer LANGUAGES CXX)
 
@@ -33,5 +36,10 @@ target_sources(PoeIndexer PRIVATE
 # Load libraries
 add_subdirectory(libs)
 find_package(spdlog CONFIG REQUIRED)
+find_package(simdjson CONFIG REQUIRED)
+
 # Link libraries
-target_link_libraries(PoeIndexer PRIVATE spdlog::spdlog spdlog::spdlog_header_only)
+target_link_libraries(PoeIndexer PRIVATE
+    spdlog::spdlog spdlog::spdlog_header_only
+    simdjson::simdjson simdjson::simdjson-flags simdjson::simdjson-headers
+)

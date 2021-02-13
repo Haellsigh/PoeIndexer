@@ -7,22 +7,21 @@
  * In charge of parsing the data received from the FetcherPSAPI.
  */
 class ParserPSAPI /* : public QObject*/ {
-  // Q_OBJECT
- public:
-  explicit ParserPSAPI(/*QObject* parent = nullptr*/);
+    // Q_OBJECT
+  public:
+    explicit ParserPSAPI(/*QObject* parent = nullptr*/);
 
-  void init(
-      spdlog::sinks_init_list                                              sinks,
-      std::shared_ptr<moodycamel::ReaderWriterQueue<std::vector<uint8_t>>> rawDataQueue);
+    void init(spdlog::sinks_init_list sinks,
+              std::shared_ptr<moodycamel::ReaderWriterQueue<std::vector<uint8_t>>> rawDataQueue);
 
-  // signals:
-  void parsed();
+    // signals:
+    void parsed();
 
- public /*slots*/:
-  void parse();
+  public /*slots*/:
+    void parse();
 
- private:
-  std::shared_ptr<spdlog::logger> mLogger;
+  private:
+    std::shared_ptr<spdlog::logger> mLogger;
 
-  std::shared_ptr<moodycamel::ReaderWriterQueue<std::vector<uint8_t>>> mRawDataQueue;
+    std::shared_ptr<moodycamel::ReaderWriterQueue<std::vector<uint8_t>>> mRawDataQueue;
 };

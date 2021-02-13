@@ -1,0 +1,14 @@
+---
+Language:                            Cpp
+BasedOnStyle:                        Microsoft
+ColumnLimit:                         120
+BreakBeforeBraces:                   Attach
+AllowShortFunctionsOnASingleLine:    true
+AllowShortBlocksOnASingleLine:       true
+AllowShortEnumsOnASingleLine:        false
+AllowShortIfStatementsOnASingleLine: true
+AlignAfterOpenBracket:               true
+AlignConsecutiveAssignments:         true
+AlignConsecutiveBitFields:           true
+AlignOperands:                       true
+...
