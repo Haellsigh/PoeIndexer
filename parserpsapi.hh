@@ -1,7 +1,6 @@
 #pragma once
 
-#include <moodycamel/readerwriterqueue.h>
-#include <spdlog/spdlog.h>
+#include "fwd_spdlog.hh"
 
 /**
  * In charge of parsing the data received from the FetcherPSAPI.
@@ -9,10 +8,9 @@
 class ParserPSAPI /* : public QObject*/ {
     // Q_OBJECT
   public:
-    explicit ParserPSAPI(/*QObject* parent = nullptr*/);
+    explicit ParserPSAPI(spdlog::sinks_init_list sinks);
 
-    void init(spdlog::sinks_init_list sinks,
-              std::shared_ptr<moodycamel::ReaderWriterQueue<std::vector<uint8_t>>> rawDataQueue);
+    void init();
 
     // signals:
     void parsed();
@@ -21,7 +19,5 @@ class ParserPSAPI /* : public QObject*/ {
     void parse();
 
   private:
-    std::shared_ptr<spdlog::logger> mLogger;
-
-    std::shared_ptr<moodycamel::ReaderWriterQueue<std::vector<uint8_t>>> mRawDataQueue;
+    std::shared_ptr<spdlog::logger> logger_;
 };

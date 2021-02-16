@@ -1,7 +1,6 @@
 #include <csignal>
 #include <memory>
 
-#include <moodycamel/readerwriterqueue.h>
 #include <spdlog/sinks/daily_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
@@ -10,7 +9,26 @@
 #include "fetcherpsapi.hh"
 #include "parserpsapi.hh"
 
-auto setupLogging() {
+bool stop_application_g = false;
+
+void signal_handler(int signal);
+
+/**
+ * This application has 3 workers working concurrently:
+ *  - FetchWorker
+ *  - ParserWorker
+ *  - DbUpdaterWorker
+ *
+ *  FetchWorker:
+ *      Fetches the latest json data from the official api.
+ *      It tries to parse the beginning of a file until it finds the "next_change_id", then use that value to start the
+ *      next fetch.
+ *      Once a json file is fully downloaded, it passes on the json data to the ParserWorker.
+ *
+ *  ParserWorker:
+ *      When it gets
+ */
+int main(int argc, char *argv[]) {
     /// Setup logging
     spdlog::set_level(spdlog::level::trace);
     // Create console sink
@@ -27,38 +45,39 @@ auto setupLogging() {
     // Set default logger
     spdlog::set_default_logger(std::make_shared<spdlog::logger>("main", sinks));
 
-    return sinks;
+    spdlog::info("Starting application");
+    std::signal(SIGTERM, signal_handler);
+    std::signal(SIGSEGV, signal_handler);
+    std::signal(SIGINT, signal_handler);
+    std::signal(SIGILL, signal_handler);
+    std::signal(SIGABRT, signal_handler);
+    std::signal(SIGFPE, signal_handler);
+
+    FetcherPSAPI fetcher(sinks);
+    ParserPSAPI parser(sinks);
+    DbUpdater updater(sinks);
+
+    // a.connect(&fetcher, &FetcherPSAPI::fetched, &parser, &ParserPSAPI::parse);
+    // a.connect(&parser, &ParserPSAPI::parsed, &updater, &DbUpdater::update);
+
+    spdlog::info("Starting threads");
+    updater.init();
+    parser.init();
+    fetcher.init("1058098813-1067130919-1025852952-1152855130-1105707904");
+
+    while (!stop_application_g)
+        ;
+
+    // return a.exec();
+    return 0;
 }
 
 void signal_handler(int signal) {
     if (signal == SIGINT) {
         spdlog::info("Terminating app");
     } else {
-        spdlog::critical("Unhandled signal");
+        spdlog::critical("Unhandled signal #{}", signal);
     }
-}
 
-int main(int argc, char *argv[]) {
-    auto sinks = setupLogging();
-
-    spdlog::info("Starting application");
-    std::signal(SIGINT, signal_handler);
-
-    auto rawDataQueue = std::make_shared<moodycamel::ReaderWriterQueue<std::vector<uint8_t>>>(1);
-    auto stashQueue   = std::make_shared<moodycamel::ReaderWriterQueue<Stash>>(1);
-
-    FetcherPSAPI fetcher;
-    ParserPSAPI parser;
-    DbUpdater updater;
-
-    // a.connect(&fetcher, &FetcherPSAPI::fetched, &parser, &ParserPSAPI::parse);
-    // a.connect(&parser, &ParserPSAPI::parsed, &updater, &DbUpdater::update);
-
-    spdlog::info("Starting threads");
-    updater.init(sinks, stashQueue);
-    parser.init(sinks, rawDataQueue);
-    fetcher.init(sinks, "692825803-707790951-674874738-763885917-729048811", rawDataQueue);
-
-    // return a.exec();
-    return 0;
+    stop_application_g = true;
 }

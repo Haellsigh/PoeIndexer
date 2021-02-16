@@ -1,12 +1,15 @@
 #include "dbupdater.hh"
 
-DbUpdater::DbUpdater(/*QObject* parent*/) /*: QObject(parent)*/ {}
+#include <spdlog/async.h>
+#include <spdlog/logger.h>
+#include <spdlog/sinks/basic_file_sink.h>
 
-void DbUpdater::init(spdlog::sinks_init_list sinks, std::shared_ptr<moodycamel::ReaderWriterQueue<Stash>> stashQueue) {
-    mLogger = std::make_shared<spdlog::logger>("updater", sinks);
-    mLogger->set_level(spdlog::level::trace);
+DbUpdater::DbUpdater(spdlog::sinks_init_list sinks) : logger_(std::make_shared<spdlog::logger>("updater", sinks)) {
+    logger_->set_level(spdlog::level::trace);
+    logger_->info("Initialized");
+}
 
-    mStashQueue = stashQueue;
+void DbUpdater::init() {
 
     // Connect to the database
     /*QStringList drivers = QSqlDatabase::drivers();
@@ -26,12 +29,10 @@ void DbUpdater::init(spdlog::sinks_init_list sinks, std::shared_ptr<moodycamel::
       mLogger->info("Connected to database {}@{}", db.databaseName().toStdString(),
                     db.hostName().toStdString());
     }*/
-
-    mLogger->info("Initialized");
 }
 
 void DbUpdater::update() {
-    mLogger->info("Getting account names from db...");
+    logger_->info("Getting account names from db...");
 
     /*auto db = QSqlDatabase::database();
     if (db.transaction()) {

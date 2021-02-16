@@ -9,20 +9,38 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 add_executable(PoeIndexer "")
 
-# LTO support
-include(CheckIPOSupported)
-check_ipo_supported(RESULT result)
-if(result)
-  set_target_properties(PoeIndexer PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
-endif()
-
-# Compilation options
+##### Compilation options
+# C++20
 target_compile_features(PoeIndexer PUBLIC cxx_std_20)
 set_target_properties(PoeIndexer PROPERTIES CXX_EXTENSIONS OFF)
+if (MSVC)
+    target_compile_options(PoeIndexer PUBLIC /Zc:__cplusplus)
+endif()
+# Enable Link Time Optimization if available
+include(CheckIPOSupported)
+check_ipo_supported(RESULT ipo_supported)
+if(ipo_supported)
+    set_target_properties(PoeIndexer PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
+    message(STATUS "Enabled Link Time optimization")
+endif()
+# Warnings
+if(MSVC)
+    target_compile_options(PoeIndexer PRIVATE /W4)
+else()
+    target_compile_options(PoeIndexer PRIVATE -Wall -Wextra -Wconversion -Wsign-conversion)
+endif()
+# CCache
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    message(STATUS "Enabled CCache")
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    set(CMAKE_CUDA_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+endif()
 
 # Add source files
 target_sources(PoeIndexer PRIVATE
   main.cpp
+  fwd_spdlog.hh
   sizeunit.hh
   apitypes.hh
   fetcherpsapi.hh
@@ -33,13 +51,16 @@ target_sources(PoeIndexer PRIVATE
   dbupdater.cpp
 )
 
-# Load libraries
+##### Libraries
+# Include
 add_subdirectory(libs)
 find_package(spdlog CONFIG REQUIRED)
 find_package(simdjson CONFIG REQUIRED)
+find_package(cpr CONFIG REQUIRED)
 
-# Link libraries
+# Link
 target_link_libraries(PoeIndexer PRIVATE
     spdlog::spdlog spdlog::spdlog_header_only
     simdjson::simdjson simdjson::simdjson-flags simdjson::simdjson-headers
+    cpr
 )

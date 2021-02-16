@@ -1,26 +1,27 @@
-﻿#include "fetcherpsapi.hh"
+﻿#include <span>
 
+#include <cpr/cpr.h>
+#include <spdlog/spdlog.h>
+
+#include "fetcherpsapi.hh"
 #include "sizeunit.hh"
 
-static constexpr const char *baseUrl = "http://www.pathofexile.com/api/public-stash-tabs?id=";
+static constexpr const char *base_fetch_url = "http://www.pathofexile.com/api/public-stash-tabs?id=";
 
-FetcherPSAPI::FetcherPSAPI(/*QObject* parent*/) /*: QObject(parent)*/ {}
+FetcherPSAPI::FetcherPSAPI(spdlog::sinks_init_list sinks)
+    : logger_(std::make_shared<spdlog::logger>("fetcher", sinks)) {
+    logger_->set_level(spdlog::level::trace);
 
-void FetcherPSAPI::init(spdlog::sinks_init_list sinks, const std::string &next_change_id,
-                        std::shared_ptr<moodycamel::ReaderWriterQueue<std::vector<uint8_t>>> rawDataQueue) {
-    mLogger = std::make_shared<spdlog::logger>("fetcher", sinks);
-    mLogger->set_level(spdlog::level::trace);
-
-    mRawDataQueue = rawDataQueue;
     /*mAccessManager = new QNetworkAccessManager(this);
 
     connect(mAccessManager, &QNetworkAccessManager::finished, this,
             &FetcherPSAPI::handleFetched);*/
+    logger_->info("Initialized");
+}
 
-    mLogger->info("Initialized");
-
-    // mTotalTimer.start();
-    fetch(next_change_id);
+void FetcherPSAPI::init(const std::string &next_change_id) {
+    fetch("1063769484-1072662929-1031349533-1158928480-1111685676");
+    fetch("1063769315-1072662783-1031349443-1158928250-1111685578");
 }
 
 bool FetcherPSAPI::canFetch() {
@@ -31,6 +32,7 @@ bool FetcherPSAPI::canFetch() {
                        [now](const auto &time_point) { return time_point < (now - std::chrono::milliseconds(1200)); }),
         mFetchTime.end());
 
+    // Can't fetch if we have more than two requests in the last second
     if (mFetchTime.size() >= 2) { return false; }
     return true;
 }
@@ -41,7 +43,20 @@ void FetcherPSAPI::fetch(const std::string &next_change_id) {
     mFetchTime.push_back(std::chrono::high_resolution_clock::now());
 
     // Fetch
-    mLogger->info("Fetching {}", next_change_id);
+    logger_->info("Fetching {}", next_change_id);
+
+    const cpr::Url url{base_fetch_url + next_change_id};
+
+    const auto id = next_request_id;
+    responses_.emplace(id, cpr::GetCallback(
+                               [=](cpr::Response) -> void {
+                                   logger_->debug("Finished request #{}", id);
+                                   responses_.erase(id);
+                               },
+                               url, cpr::WriteCallback([=](const std::string &data) -> bool {
+                                   handle_new_data(id, data);
+                                   return true;
+                               })));
 
     /*QNetworkRequest req(baseUrl + next_change_id);
     req.setRawHeader(
@@ -76,6 +91,24 @@ void FetcherPSAPI::fetch(const std::string &next_change_id) {
     }
     */
     /*});*/
+}
+
+void FetcherPSAPI::handle_new_data(std::size_t id, const std::string &data) {
+    if (data.size() < 50) return;
+    // logger_->debug("Handling data for request #{}", id);
+    auto start = std::find(data.begin(), data.end(), ':');
+    if (start >= std::prev(data.end(), 2)) return;
+    std::advance(start, 2);
+    auto end = std::find(start, data.end(), ',');
+    if (end == data.end()) return;
+    std::advance(end, -1);
+    if (end <= start) return;
+
+    std::string_view nci(start, end);
+    if (std::count(nci.begin(), nci.end(), '-') != 4) return;
+    logger_->debug("next change id: {}", nci);
+
+    fetch(std::string(nci));
 }
 
 /*

@@ -7,5 +7,5 @@ In the root folder:
 ```
 .\vcpkg\bootstrap-vcpkg.bat -disableMetrics
 .\vcpkg\vcpkg install spdlog
-.\vcpkg\vcpkg install --head simdjson
+.\vcpkg\vcpkg install --head simdjson cpr
 ```
