@@ -23,8 +23,13 @@ struct StashAPIReply {
 /**
  * In charge of fetching the latest data from the public stash api.
  */
-class FetcherPSAPI /* : public QObject */ {
-    // Q_OBJECT
+class FetcherPSAPI {
+    struct request {
+        std::future<void> response;
+        std::string data          = {};
+        bool found_next_change_id = false;
+    };
+
   public:
     explicit FetcherPSAPI(spdlog::sinks_init_list sinks);
 
@@ -43,9 +48,9 @@ class FetcherPSAPI /* : public QObject */ {
     std::shared_ptr<spdlog::logger> logger_;
     std::size_t request_id_ = 0;
 
-    std::size_t next_request_id = 0;
-    // QHash<QNetworkReply*, StashAPIReply> mReplies;
-    std::unordered_map<std::size_t, std::future<void>> responses_;
+    std::unordered_map<std::size_t, request> responses_;
+    std::size_t n_items_ = 0;
+
     std::string mLastChangeId;
 
     std::vector<std::chrono::high_resolution_clock::time_point> mFetchTime;

@@ -1,6 +1,7 @@
 ﻿#include <span>
 
 #include <cpr/cpr.h>
+#include <simdjson.h>
 #include <spdlog/spdlog.h>
 
 #include "fetcherpsapi.hh"
@@ -19,10 +20,7 @@ FetcherPSAPI::FetcherPSAPI(spdlog::sinks_init_list sinks)
     logger_->info("Initialized");
 }
 
-void FetcherPSAPI::init(const std::string &next_change_id) {
-    fetch("1063769484-1072662929-1031349533-1158928480-1111685676");
-    fetch("1063769315-1072662783-1031349443-1158928250-1111685578");
-}
+void FetcherPSAPI::init(const std::string &next_change_id) { fetch(next_change_id); }
 
 bool FetcherPSAPI::canFetch() {
     // Remove all fetch times more than 1s ago
@@ -47,16 +45,95 @@ void FetcherPSAPI::fetch(const std::string &next_change_id) {
 
     const cpr::Url url{base_fetch_url + next_change_id};
 
-    const auto id = next_request_id;
-    responses_.emplace(id, cpr::GetCallback(
-                               [=](cpr::Response) -> void {
-                                   logger_->debug("Finished request #{}", id);
-                                   responses_.erase(id);
-                               },
-                               url, cpr::WriteCallback([=](const std::string &data) -> bool {
-                                   handle_new_data(id, data);
-                                   return true;
-                               })));
+    const auto id = request_id_++;
+    responses_.emplace(
+        id, request{cpr::GetCallback(
+                [=](cpr::Response r) -> void {
+                    auto &&data = responses_[id].data;
+
+                    logger_->debug("Finished request #{} with code {}", id, r.status_code);
+                    if (r.status_code != 200) {
+                        const auto &limit = r.header.at("X-Rate-Limit-Ip-State");
+                        // limit is formatted this way:
+                        // {requests}:{window}:{throttled}
+                        // {x}:       {y}:     {z}
+                        // x requests per y seconds, throttled by z seconds
+                        // The part after the last ':' always represent the amount of seconds to wait
+                        // before doing the next request
+                        const auto throttled_str = limit.substr(limit.rfind(':') + 1);
+                        const auto throttled     = std::stoi(throttled_str);
+
+                        logger_->debug("We are throttled for {}s", throttled);
+                    } else {
+                        logger_->debug("size: {}", data.size());
+                        // TODO MOVE TO PARSERAPI
+                        // simple parse
+                        using namespace simdjson;
+
+                        dom::parser parser;
+                        dom::object object;
+                        error_code error;
+
+                        parser.parse(padded_string(data.data(), data.size())).get<dom::object>().tie(object, error);
+
+                        if (error || object.size() != 2) {
+                            logger_->error("Invalid data received");
+                            return;
+                        }
+
+                        int nStashes = 0, nStashesCurrentLeague = 0, nItems = 0, nItemsCurrentLeague = 0;
+
+                        dom::element stashes;
+                        object["stashes"].tie(stashes, error);
+
+                        if (error || !stashes.is<dom::array>()) {
+                            logger_->error("Could not find stashes data in json");
+                            return;
+                        }
+
+                        for (const auto &stash : stashes) {
+                            nStashes++;
+
+                            std::string_view league;
+                            stash["league"].get<std::string_view>().tie(league, error);
+
+                            if (error) {
+                                // No league data
+                                // mLogger->warn("Json error parsing league: {}", error);
+                                continue;
+                            }
+
+                            dom::array items;
+                            stash["items"].get<dom::array>().tie(items, error);
+
+                            if (error) {
+                                logger_->error("Json error parsing items: {}", error);
+                                continue;
+                            }
+
+                            nItems += items.size();
+
+                            if (league == std::string_view("Ritual")) {
+                                nStashesCurrentLeague++;
+                                nItemsCurrentLeague += items.size();
+                                // mLogger->trace("Account {}, stash id {}", stash["accountName"], stash["id"]);
+                            } else {
+                            }
+                        }
+
+                        logger_->debug("Parsed {}/{} stashes for {}/{} items", nStashesCurrentLeague, nStashes,
+                                       nItemsCurrentLeague, nItems);
+                        n_items_ += nItems;
+                    }
+
+                    logger_->debug("Total items: {}", n_items_);
+
+                    responses_.erase(id);
+                },
+                url, cpr::WriteCallback([=](const std::string &data) -> bool {
+                    handle_new_data(id, data);
+                    return true;
+                }))});
 
     /*QNetworkRequest req(baseUrl + next_change_id);
     req.setRawHeader(
@@ -94,6 +171,11 @@ void FetcherPSAPI::fetch(const std::string &next_change_id) {
 }
 
 void FetcherPSAPI::handle_new_data(std::size_t id, const std::string &data) {
+    auto &&r = responses_[id];
+
+    r.data.append(data);
+    if (r.found_next_change_id) { return; }
+
     if (data.size() < 50) return;
     // logger_->debug("Handling data for request #{}", id);
     auto start = std::find(data.begin(), data.end(), ':');
@@ -106,7 +188,9 @@ void FetcherPSAPI::handle_new_data(std::size_t id, const std::string &data) {
 
     std::string_view nci(start, end);
     if (std::count(nci.begin(), nci.end(), '-') != 4) return;
-    logger_->debug("next change id: {}", nci);
+    // logger_->debug("next change id: {}", nci);
+
+    r.found_next_change_id = true;
 
     fetch(std::string(nci));
 }
