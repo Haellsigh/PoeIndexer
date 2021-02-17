@@ -13,14 +13,15 @@ FetcherPSAPI::FetcherPSAPI(spdlog::sinks_init_list sinks)
     : logger_(std::make_shared<spdlog::logger>("fetcher", sinks)) {
     logger_->set_level(spdlog::level::trace);
 
-    /*mAccessManager = new QNetworkAccessManager(this);
-
-    connect(mAccessManager, &QNetworkAccessManager::finished, this,
-            &FetcherPSAPI::handleFetched);*/
     logger_->info("Initialized");
 }
 
-void FetcherPSAPI::init(const std::string &next_change_id) { fetch(next_change_id); }
+void FetcherPSAPI::init(const std::string &next_change_id) {
+    rate_limiter_.set_limits(1, 1);
+    rate_limiter_.execute([&]() { fetch(next_change_id); });
+    rate_limiter_.execute([&]() { fetch("1063770573-1072664255-1031350901-1158929312-1111686980"); });
+    rate_limiter_.execute([&]() { fetch("1063771524-1072664890-1031351606-1158930029-1111687787"); });
+}
 
 bool FetcherPSAPI::canFetch() {
     // Remove all fetch times more than 1s ago
@@ -52,15 +53,23 @@ void FetcherPSAPI::fetch(const std::string &next_change_id) {
                     auto &&data = responses_[id].data;
 
                     logger_->debug("Finished request #{} with code {}", id, r.status_code);
+
+                    const auto &limit            = r.header.at("X-Rate-Limit-Ip");
+                    const auto request_limit_str = limit.substr(0, limit.find(':'));
+                    const auto duration_str =
+                        limit.substr(request_limit_str.size() + 1, limit.rfind(':') - request_limit_str.size() - 1);
+                    rate_limiter_.set_limits(std::stoi(request_limit_str), std::stod(duration_str));
+
                     if (r.status_code != 200) {
-                        const auto &limit = r.header.at("X-Rate-Limit-Ip-State");
-                        // limit is formatted this way:
+                        const auto &state = r.header.at("X-Rate-Limit-Ip-State");
+                        // X-Rate-Limit-Ip-State is formatted this way:
                         // {requests}:{window}:{throttled}
                         // {x}:       {y}:     {z}
                         // x requests per y seconds, throttled by z seconds
                         // The part after the last ':' always represent the amount of seconds to wait
                         // before doing the next request
-                        const auto throttled_str = limit.substr(limit.rfind(':') + 1);
+
+                        const auto throttled_str = state.substr(state.rfind(':') + 1);
                         const auto throttled     = std::stoi(throttled_str);
 
                         logger_->debug("We are throttled for {}s", throttled);
@@ -192,7 +201,7 @@ void FetcherPSAPI::handle_new_data(std::size_t id, const std::string &data) {
 
     r.found_next_change_id = true;
 
-    fetch(std::string(nci));
+    rate_limiter_.execute([&]() { fetch(std::string(nci)); });
 }
 
 /*

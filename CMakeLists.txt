@@ -49,6 +49,8 @@ target_sources(PoeIndexer PRIVATE
   parserpsapi.cpp
   dbupdater.hh
   dbupdater.cpp
+  ratelimiter.hh
+  ratelimiter.cc
 )
 
 ##### Libraries

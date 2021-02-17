@@ -10,6 +10,7 @@
 #include <cpr/cpr.h>
 
 #include "fwd_spdlog.hh"
+#include "ratelimiter.hh"
 
 struct StashAPIReply {
     StashAPIReply() { /*timer.start();*/
@@ -50,6 +51,7 @@ class FetcherPSAPI {
 
     std::unordered_map<std::size_t, request> responses_;
     std::size_t n_items_ = 0;
+    RateLimiter rate_limiter_;
 
     std::string mLastChangeId;
 
